@@ -5,12 +5,13 @@ on:
     types: selective-build-and-deploy
 
 jobs:
-  outputs:
-    services: ${{ jobs.default.services }}
   defaults:
+    outputs:
+      services: ${{ jobs.defaults.main.services }}
     runs-on: ubuntu-latest
     steps:
-      - run: |
+      - id: main
+        run: |
           if test -n '${{ github.event.client_payload.services }}'; then
             echo '::set-output name=services::${{ github.event.client_payload.services }}'
           else
