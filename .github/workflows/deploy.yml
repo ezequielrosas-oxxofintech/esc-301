@@ -10,5 +10,6 @@ jobs:
       matrix:
         app_name: ${{ github.event.client_payload.services }}
     runs-on: ubuntu-latest
-    steps: |
-      echo ${{ matrix.app_name }} done
+    steps:
+      - run: |
+          echo ${{ matrix.app_name }} done 
