@@ -21,7 +21,7 @@ jobs:
     needs: defaults
     strategy:
       matrix:
-        app_name: ${{ needs.defaults.outputs.services }}
+        app_name: ${{ fromJson(needs.defaults.outputs.services) }}
 
     runs-on: ubuntu-latest
     steps:
