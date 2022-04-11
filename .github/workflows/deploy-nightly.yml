@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        env: [dev, qa]
+        env: ["dev", "qa"]
     runs-on: ubuntu-latest
     steps:
       - name: Trigger ${{ matrix.env }}
@@ -23,8 +23,7 @@ jobs:
               "event_type": "selective-build-and-deploy",
               "client_payload": {
                 "env": "${{ matrix.env }}",
-                "branch": "${{ matrix.env }}",
-                "services": ["transaction-service"]
+                "branch": "${{ matrix.env }}"
               }
             }
 
