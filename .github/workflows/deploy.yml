@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-        echo '::set-output name=services::["a-service","b-service","c-service"]'
+          echo '::set-output name=services::["a-service","b-service","c-service"]'
 
   build:
     strategy:
