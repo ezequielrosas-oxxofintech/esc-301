@@ -7,7 +7,7 @@ on:
 jobs:
   defaults:
     outputs:
-      services: ${{ jobs.defaults.main.services }}
+      services: ${{ steps.main.outputs.services }}
     runs-on: ubuntu-latest
     steps:
       - id: main
