@@ -15,14 +15,14 @@ jobs:
       - name: Trigger ${{ matrix.env }}
         uses: peter-evans/repository-dispatch@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.TRIGGER_TOKEN }}
           repository: ${{ github.repository }}
           event-type: selective-build-and-deploy
           client-payload: >
             {
               "event_type": "selective-build-and-deploy",
               "client_payload": {
-                "env": "${ matrix.env }}",
+                "env": "${{ matrix.env }}",
                 "branch": "${{ matrix.env }}",
                 "services": ["transaction-service"]
               }
