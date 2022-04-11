@@ -1,0 +1,46 @@
+name: Deploy Nightly
+on:
+  push:
+    branches:
+      - master
+      
+jobs:
+  nightly:
+    name: Deploy nightly
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [dev, qa]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Trigger ${{ matrix.env }}
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          repository: ${{ github.repository }}
+          event-type: selective-build-and-deploy
+          client-payload: >
+            {
+              "event_type": "selective-build-and-deploy",
+              "client_payload": {
+                "env": "${ matrix.env }}",
+                "branch": "${{ matrix.env }}",
+                "services": ["transaction-service"]
+              }
+            }
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          repository: username/my-repo
+          event-type: my-event
+          client-payload: >
+            {
+              "event_type": "selective-build-and-deploy",
+              "client_payload": {
+                "commit": "ca21ad15517e5ce937cb541e38b6ce0f9a585252",
+                "env": "QA",
+                "branch": "qa",
+                "services": ["transaction-service"]
+              }
+            }
