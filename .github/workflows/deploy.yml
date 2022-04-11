@@ -13,7 +13,7 @@ jobs:
       - id: main
         run: |
           if test -n '${{ github.event.client_payload.services }}'; then
-            echo '::set-output name=services::${{ github.event.client_payload.services }}'
+            echo '::set-output name=services::${{ toJson(github.event.client_payload.services) }}'
           else
             echo '::set-output name=services::["a-service","b-service","c-service"]'
           fi
