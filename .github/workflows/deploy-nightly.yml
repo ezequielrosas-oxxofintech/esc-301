@@ -18,12 +18,9 @@ jobs:
           token: ${{ secrets.TRIGGER_TOKEN }}
           repository: ${{ github.repository }}
           event-type: selective-build-and-deploy
-          client-payload: >
+          client-payload: |
             {
-              "event_type": "selective-build-and-deploy",
-              "client_payload": {
-                "env": "${{ matrix.env }}",
-                "branch": "${{ matrix.env }}"
-              }
+              "env": "${{ matrix.env }}",
+              "branch": "${{ matrix.env }}"
             }
 
