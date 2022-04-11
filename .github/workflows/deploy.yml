@@ -9,7 +9,7 @@ jobs:
     if: '${{ ! github.event.client_payload.services }}'
     runs-on: ubuntu-latest
     steps:
-      - run |
+      - run: |
         echo '::set-output name=services::["a-service","b-service","c-service"]'
 
   build:
