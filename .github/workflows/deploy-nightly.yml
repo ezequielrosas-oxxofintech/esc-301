@@ -15,7 +15,7 @@ jobs:
       - name: Trigger ${{ matrix.env }}
         uses: peter-evans/repository-dispatch@v2
         with:
-          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           event-type: selective-build-and-deploy
           client-payload: >
