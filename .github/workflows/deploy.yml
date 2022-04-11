@@ -5,19 +5,24 @@ on:
     types: selective-build-and-deploy
 
 jobs:
-  default:
-    if: '${{ ! github.event.client_payload.services }}'
+  outputs:
+    services: ${{ jobs.default.services }}
+  defaults:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo '::set-output name=services::["a-service","b-service","c-service"]'
-
+          if test -n '${{ github.event.client_payload.services }}'; then
+            echo '::set-output name=services::${{ github.event.client_payload.services }}'
+          else
+            echo '::set-output name=services::["a-service","b-service","c-service"]'
+          fi
   build:
+    needs: defaults
     strategy:
       matrix:
-        app_name: ${{ github.event.client_payload.services }}
+        app_name: ${{ needs.defaults.services }}
 
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo ${{ matrix.app_name }} done 
+          echo ${{ matrix.app_name }} done
