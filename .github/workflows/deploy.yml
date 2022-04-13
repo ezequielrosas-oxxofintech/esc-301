@@ -22,8 +22,8 @@ jobs:
         env:
           # GithubActions stringifies has a bash friendly stringify,
           # and a different more useful json serialization.
-          SERVICES: ${{ toJson(github.event.client_payload.services) }}
-          HAS_SERVICES: ${{ github.event.client_payload.services }}
+          SERVICES: '${{ toJson(github.event.client_payload.services) }}'
+          HAS_SERVICES: '${{ github.event.client_payload.services }}'
           VALIDATE_PAYLOAD_SERVICES_JQ_SCRIPT: |
             env.SERVICES |
             (try fromjson | arrays | select(length > 0)) // error(
