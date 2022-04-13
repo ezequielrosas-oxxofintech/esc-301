@@ -10,6 +10,10 @@ jobs:
       services: ${{ toJson(github.event.client_payload.services) || steps.main.outputs.services }}
     runs-on: ubuntu-latest
     steps:
+      - env:
+          SERVICES: ${{ toJson(github.event.client_payload.services) }}
+        run: |
+          echo "$SERVICES"
       - uses: actions/checkout@v2
         if: '!github.event.client_payload.services'
         with:
