@@ -7,7 +7,7 @@ on:
 jobs:
   defaults:
     outputs:
-      services: ${{ steps.main.outputs.services }}
+      services: ${{ github.event.client_payload.services || fromJson(steps.main.outputs.services) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -15,19 +15,15 @@ jobs:
         with:
           ref: ${{ github.event.client_payload.branch }}
       - id: main
+        if: '!github.event.client_payload.services'
         run: |
-          if test -n '${{ github.event.client_payload.services }}'; then
-            echo '::set-output name=services::${{ toJson(github.event.client_payload.services) }}' | tr -d '\n'
-            echo
-          else
-            printf %s '::set-output name=services::'
-            jq -cnR '[inputs]' README.md
-          fi
+          printf %s '::set-output name=services::'
+          jq -cnR '[inputs]' README.md
   build:
     needs: defaults
     strategy:
       matrix:
-        app_name: ${{ fromJson(needs.defaults.outputs.services) }}
+        app_name: ${{ needs.defaults.outputs.services }}
 
     runs-on: ubuntu-latest
     steps:
