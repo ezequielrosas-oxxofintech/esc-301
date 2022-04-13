@@ -11,9 +11,7 @@ jobs:
       matrix:
         payload:
           - env: "dev"
-            branch: master
-          - env: "qa"
-            branch: qa
+            branch: main
     runs-on: ubuntu-latest
     steps:
       - name: Trigger ${{ matrix.env }}

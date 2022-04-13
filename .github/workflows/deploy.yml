@@ -29,7 +29,7 @@ jobs:
             {print $2}
 
         run: |
-          set -ueo pipefail
+          set -uexo pipefail
           bin=$(mktemp -d)
           export PATH="$bin:$PATH"
           wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -O "$bin/jq"
