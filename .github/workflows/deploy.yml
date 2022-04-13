@@ -31,7 +31,7 @@ jobs:
         run: |
           set -ueo pipefail
           bin=$(mktemp -d)
-          export PATH="$PATH:$bin"
+          export PATH="$bin:$PATH"
           wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -O "$bin/jq"
           chmod +x "$bin/jq"
           printf %s '::set-output name=services::'
