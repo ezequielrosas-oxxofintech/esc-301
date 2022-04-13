@@ -10,22 +10,15 @@ jobs:
       services: ${{ toJson(github.event.client_payload.services) || steps.main.outputs.services }}
     runs-on: ubuntu-latest
     steps:
-      - env:
-          SERVICES: ${{ toJson(github.event.client_payload.services) }}
-        run: |
-          echo "$SERVICES"
       - uses: actions/checkout@v2
         if: '!github.event.client_payload.services'
         with:
           ref: ${{ github.event.client_payload.branch }}
       - id: main
         env:
-          # GithubActions stringifies has a bash friendly stringify,
-          # and a different more useful json serialization.
-          SERVICES: '${{ toJson(github.event.client_payload.services) }}'
-          HAS_SERVICES: '${{ github.event.client_payload.services }}'
+          SERVICES_JSON: '${{ toJson(github.event.client_payload.services) }}'
           VALIDATE_PAYLOAD_SERVICES_JQ_SCRIPT: |
-            env.SERVICES |
+            env.SERVICES_JSON |
             (try fromjson | arrays | select(length > 0)) // error(
               "services should be a json list of projects from settings.gradle. Got: \(.)")
 
@@ -42,7 +35,7 @@ jobs:
           wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -O "$bin/jq"
           chmod +x "$bin/jq"
           printf %s '::set-output name=services::'
-          if test -z '${HAS_SERVICES:-}'; then
+          if test -z '${{ github.event.client_payload.services }}'; then
             awk "$LOAD_DEFAULT_SERVICES_AWK_SCRIPT" README.md | jq -MncR '[inputs]'
           else
             jq -Mnc "$VALIDATE_PAYLOAD_SERVICES_JQ_SCRIPT"
