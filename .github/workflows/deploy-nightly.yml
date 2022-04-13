@@ -9,7 +9,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        env: ["dev", "qa"]
+        payload:
+          - env: "dev"
+            branch: master
+          - env: "qa"
+            branch: qa
     runs-on: ubuntu-latest
     steps:
       - name: Trigger ${{ matrix.env }}
@@ -20,7 +24,7 @@ jobs:
           event-type: selective-build-and-deploy
           client-payload: |
             {
-              "env": "${{ matrix.env }}",
-              "branch": "${{ matrix.env }}"
+              "env": "${{ matrix.payload.env }}",
+              "branch": "${{ matrix.payload.env }}"
             }
 
