@@ -32,7 +32,7 @@ jobs:
           set -uexo pipefail
           bin=$(mktemp -d)
           export PATH="$bin:$PATH"
-          wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -O "$bin/jq"
+          wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -O "$bin/jq" --quiet
           chmod +x "$bin/jq"
           printf %s '::set-output name=services::'
           if test -z '${{ github.event.client_payload.services }}'; then
