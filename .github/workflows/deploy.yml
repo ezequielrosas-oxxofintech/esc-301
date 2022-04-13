@@ -19,10 +19,35 @@ jobs:
         with:
           ref: ${{ github.event.client_payload.branch }}
       - id: main
-        if: '!github.event.client_payload.services'
+        env:
+          # GithubActions stringifies has a bash friendly stringify,
+          # and a different more useful json serialization.
+          SERVICES: ${{ toJson(github.event.client_payload.services) }}
+          HAS_SERVICES: ${{ github.event.client_payload.services }}
+          VALIDATE_PAYLOAD_SERVICES_JQ_SCRIPT: |
+            env.SERVICES |
+            (try fromjson | arrays | select(length > 0)) // error(
+              "services should be a json list of projects from settings.gradle. Got: \(.)")
+
+          LOAD_DEFAULT_SERVICES_AWK_SCRIPT: |
+            BEGIN {FS="'"}         # subproject names are surrounded by single quotes
+            $1 !~ "include" {next} # subprojects are denoted by include command
+            $2 == "core"    {next} # core subproject is a library, not a microservice, skip.
+            {print $2}
+
         run: |
+          set -ueo pipefail
+          bin=$(mktemp -d)
+          export PATH="$PATH:$bin"
+          wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -O "$bin/jq"
+          chmod +x "$bin/jq"
           printf %s '::set-output name=services::'
-          jq -cnR '[inputs]' README.md
+          if test -z '${HAS_SERVICES:-}'; then
+            awk "$LOAD_DEFAULT_SERVICES_AWK_SCRIPT" README.md | jq -MncR '[inputs]'
+          else
+            jq -Mnc "$VALIDATE_PAYLOAD_SERVICES_JQ_SCRIPT"
+          fi
+
   build:
     needs: defaults
     strategy:
