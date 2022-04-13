@@ -25,6 +25,6 @@ jobs:
           client-payload: |
             {
               "env": "${{ matrix.payload.env }}",
-              "branch": "${{ matrix.payload.env }}"
+              "branch": "${{ matrix.payload.branch }}"
             }
 
