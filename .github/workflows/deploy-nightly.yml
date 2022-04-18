@@ -22,17 +22,21 @@ jobs:
           KUBE_CONFIG_DATA: ${{ secrets[matrix.kube_config_data_secret] }}
         with:
           args: wait deployment -lapp --for=condition=Available --timeout=30m
-  trigger:
+  deploy:
+    name: Deploy nightly
     strategy:
       fail-fast: false
       matrix:
         payload:
-          - env: "dev"
-            branch: main
-    runs-on: ubuntu-latest
+          - env: dev
+            branch: master
+          - env: qa
+            branch: qa
+    runs-on: self-hosted-back
     steps:
       - name: Trigger ${{ matrix.env }}
         uses: peter-evans/repository-dispatch@v2
+        if: secrets.TRIGGER_TOKEN
         with:
           token: ${{ secrets.TRIGGER_TOKEN }}
           repository: ${{ github.repository }}
