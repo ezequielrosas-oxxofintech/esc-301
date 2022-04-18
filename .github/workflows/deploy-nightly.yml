@@ -6,15 +6,28 @@ on:
 jobs:
   test_1:
     runs-on: ubuntu-latest
-    if: false
+    if: secrets.TRIGGER_TOKEN
     steps:
       - run: |
           echo hi
-  test_2:
-    runs-on: ubuntu-latest
+  validate:
+    name: Validate nightly
+    strategy:
+      fail-fast: false
+      matrix:
+        payload:
+          - env: DEV
+            kube_config_data_secret: DEV_KUBE_CONFIG_DATA
+          - env: QA
+            kube_config_data_secret: QA_KUBE_CONFIG_DATA
+    runs-on: self-hosted-back
     steps:
-      - run: |
-          bye
+      - name: Check ${{ matrix.env }} deployments
+        uses: Consensys/kubernetes-action@master
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets[matrix.kube_config_data_secret] }}
+        with:
+          args: wait deployment -lapp --for=condition=Available --timeout=30m
   trigger:
     strategy:
       fail-fast: false
