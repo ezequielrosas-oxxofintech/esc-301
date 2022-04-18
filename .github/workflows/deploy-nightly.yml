@@ -14,7 +14,7 @@ jobs:
             kube_config_data_secret: DEV_KUBE_CONFIG_DATA
           - env: QA
             kube_config_data_secret: QA_KUBE_CONFIG_DATA
-    runs-on: self-hosted-back
+    runs-on: ubuntu-latest
     steps:
       - name: Check ${{ matrix.env }} deployments
         uses: Consensys/kubernetes-action@master
@@ -34,9 +34,15 @@ jobs:
             branch: qa
     runs-on: self-hosted-back
     steps:
+      - name: Expose token
+        id: hasToken
+        run: |
+          if test -n "${{secrets.TRIGGER_TOKEN}}"; then
+            echo '::set-output name=hasToken::true'
+          fi
       - name: Trigger ${{ matrix.env }}
         uses: peter-evans/repository-dispatch@v2
-        if: secrets.TRIGGER_TOKEN
+        if: steps.hasToken.output.hasToken == 'true'
         with:
           token: ${{ secrets.TRIGGER_TOKEN }}
           repository: ${{ github.repository }}
