@@ -32,7 +32,7 @@ jobs:
             branch: master
           - env: qa
             branch: qa
-    runs-on: self-hosted-back
+    runs-on: ubuntu-latest
     steps:
       - name: Expose token
         id: hasToken
