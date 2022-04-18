@@ -16,6 +16,9 @@ jobs:
             kube_config_data_secret: QA_KUBE_CONFIG_DATA
     runs-on: ubuntu-latest
     steps:
+      - name: Check config data
+        run: |
+          test -n "${{ secrets[matrix.kube_config_data_secret] }}"
       - name: Check ${{ matrix.env }} deployments
         uses: Consensys/kubernetes-action@master
         env:
@@ -23,7 +26,7 @@ jobs:
         with:
           args: wait deployment -lapp --for=condition=Available --timeout=30m
   deploy:
-    name: Deploy nightly
+    name: deploy nightly
     strategy:
       fail-fast: false
       matrix:
@@ -34,17 +37,17 @@ jobs:
             branch: qa
     runs-on: ubuntu-latest
     steps:
-      - name: Expose token
-        id: hasToken
+      - name: expose token
+        id: hastoken
         run: |
-          if test -n "${{secrets.TRIGGER_TOKEN}}"; then
-            echo '::set-output name=hasToken::true'
+          if test -n "${{secrets.trigger_token}}"; then
+            echo '::set-output name=hastoken::true'
           fi
-      - name: Trigger ${{ matrix.env }}
+      - name: trigger ${{ matrix.env }}
         uses: peter-evans/repository-dispatch@v2
-        if: steps.hasToken.output.hasToken == 'true'
+        if: steps.hastoken.output.hastoken == 'true'
         with:
-          token: ${{ secrets.TRIGGER_TOKEN }}
+          token: ${{ secrets.trigger_token }}
           repository: ${{ github.repository }}
           event-type: selective-build-and-deploy
           client-payload: |
