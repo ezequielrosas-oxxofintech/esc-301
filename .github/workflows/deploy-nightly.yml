@@ -6,7 +6,7 @@ on:
 jobs:
   test_1:
     runs-on: ubuntu-latest
-    if: secrets.TRIGGER_TOKEN
+    if: ${{ secrets.DEPLOY_TOKEN }}
     steps:
       - run: |
           echo hi
