@@ -3,8 +3,18 @@ on:
   push:
     branches:
       - main
-
 jobs:
+  test_1:
+    runs-on: ubuntu-latest
+    if: false
+    steps:
+      - run: |
+          echo hi
+  test_2:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          bye
   trigger:
     strategy:
       fail-fast: false
@@ -25,4 +35,3 @@ jobs:
               "env": "${{ matrix.payload.env }}",
               "branch": "${{ matrix.payload.branch }}"
             }
-
