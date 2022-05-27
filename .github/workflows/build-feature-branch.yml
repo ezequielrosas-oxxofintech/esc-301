@@ -19,8 +19,10 @@ jobs:
     needs: build_matrix
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          echo env: ${{ needs.build_matrix.outputs.env }}
-          echo branch: ${{ github.head_ref }}
-          echo services: ${{ needs.build_matrix.outputs.services }}
-          echo services: ${{ needs.build_matrix.outputs.albs }}
+      - env:
+          env: ${{ needs.build_matrix.outputs.env }}
+          branch: ${{ github.head_ref }}
+          services: ${{ needs.build_matrix.outputs.services }}
+          albs: ${{ needs.build_matrix.outputs.albs }}
+        run: |
+          env
