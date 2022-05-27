@@ -17,12 +17,11 @@ jobs:
 
   build_and_deploy:
     needs: build_matrix
-    runs-on: ubuntu-latest
-    steps:
-      - env:
-          env: ${{ needs.build_matrix.outputs.env }}
-          branch: ${{ github.head_ref }}
-          services: ${{ needs.build_matrix.outputs.services }}
-          albs: ${{ needs.build_matrix.outputs.albs }}
-        run: |
-          printenv env branch services albs
+    uses: ./.github/workflows/build-and-deploy-services.yml
+    secrets: inherit
+    with:
+      env: ${{ needs.build_matrix.outputs.env }}
+      branch: ${{ github.head_ref }}
+      services: ${{ needs.build_matrix.outputs.services }}
+      should_deploy: false
+      should_deploy_prod: false
