@@ -74,8 +74,6 @@ on:
         required: true
       PROD_HSM_IP:
         required: true
-      PROD_KEY_RECEIVED:
-        required: true
       PROD_KUBE_CONFIG_DATA:
         required: true
       PROD_VPC_ID:
