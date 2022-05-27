@@ -416,11 +416,12 @@ jobs:
           IMAGE_TAG: ${{ format('{0}/{1}{2}/{3}:{4}', steps.login-ecr.outputs.registry, env.PRODUCT_NAME, env.STAGE, env.APP_NAME, env.SERVICE_VERSION) }}
       - name: 🏢 Deploy micro-service to EKS
 #        uses: Consensys/kubernetes-action@master
-        if: (inputs.should_deploy && !(inputs.env == 'prod' || inputs.env == 'dr')) || (inputs.should_deploy_prod && (inputs.env == 'prod' || inputs.env == 'dr'))
+#        if: (inputs.should_deploy && !(inputs.env == 'prod' || inputs.env == 'dr')) || (inputs.should_deploy_prod && (inputs.env == 'prod' || inputs.env == 'dr'))
         env:
           KUBE_CONFIG_DATA: ${{ env.KUBE_CONFIG_DATA }}
         run: |
           echo ${{ format('apply -f ./{0}/kubernetes.deployment.yml', env.APP_NAME) }}
+          cat ./$APP_NAME/kubernetes.deployment.yml
       - name: 🔒 Logout of Amazon ECR
         if: always()
         run: |
