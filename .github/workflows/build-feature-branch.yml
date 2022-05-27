@@ -13,7 +13,7 @@ jobs:
     uses: ./.github/workflows/detect-changed-services.yml
     secrets: inherit
     with:
-      branch: ''
+      branch: '' # meaning: default checkout behavior
 
   build_and_deploy:
     needs: build_matrix
