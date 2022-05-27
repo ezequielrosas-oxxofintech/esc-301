@@ -25,13 +25,15 @@ jobs:
       services: ${{ steps.main.outputs.services }}
       albs: ${{ steps.main.outputs.albs }}
     steps:
-      - uses: actions/checkout@v3
+      - run: |
+          echo $GITHUB_WORKSPACE
+      - uses: actions/checkout@v2
         with:
           ref: ${{ inputs.branch }}
           fetch-depth: 0
       - name: 🗂 Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@v17.2
+        uses: tj-actions/changed-files@v21
       - name: 🗂 Get changed projects
         id: main
         env:
