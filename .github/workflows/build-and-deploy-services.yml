@@ -363,8 +363,7 @@ jobs:
           PACKAGE_USERNAME: ${{ secrets.PACKAGE_USERNAME }}
           PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
         run: |
-          echo ./gradlew :${{ env.APP_NAME }}:build --refresh-dependencies
-          env
+          ./gradlew :${{ env.APP_NAME }}:build --refresh-dependencies
       - name: 🔑 Configure AWS Credentials
         if: inputs.should_deploy
         uses: fintechdigitalventure/configure-aws-credentials@master
@@ -388,6 +387,7 @@ jobs:
           echo "::set-env name=SERVICE_VERSION::$SERVICE_VERSION"
           echo "::set-env name=BUILD_SHA::$BUILD_SHA"
       - name: 🏗️ Build, Tag, and Push Images to Amazon ECR
+        if: inputs.should_deploy
         env:
           SERVICE_VERSION: ${{ env.SERVICE_VERSION }}
           IMAGE_TAG: ${{ env.SERVICE_VERSION }}
@@ -399,12 +399,12 @@ jobs:
           DYNATRACE_ENABLED: ${{ env.DYNATRACE_ENABLED }}
           APP_NAME: ${{ env.APP_NAME }}
         run: |
-          echo docker pull $BASE_IMAGE
-          echo docker pull $BASE_IMAGE_SECURITY
-          echo docker-compose build --no-cache $APP_NAME
-          echo docker-compose push $APP_NAME
-          env
+          docker pull $BASE_IMAGE
+          docker pull $BASE_IMAGE_SECURITY
+          docker-compose build --no-cache $APP_NAME
+          docker-compose push $APP_NAME
       - name: 📄 Inject environment variables into kubernetes manifest
+        if: inputs.should_deploy
         uses: nowactions/envsubst@v1
         with:
           input: ${{ format('./{0}/kubernetes.yml', env.APP_NAME) }}
@@ -415,13 +415,12 @@ jobs:
           FLUENT_BIT_IMAGE: ${{ format('{0}/{1}/spin-fluent-bit:2.23.0', steps.login-ecr.outputs.registry, env.REPOSITORY) }}
           IMAGE_TAG: ${{ format('{0}/{1}{2}/{3}:{4}', steps.login-ecr.outputs.registry, env.PRODUCT_NAME, env.STAGE, env.APP_NAME, env.SERVICE_VERSION) }}
       - name: 🏢 Deploy micro-service to EKS
-#        uses: Consensys/kubernetes-action@master
-#        if: (inputs.should_deploy && !(inputs.env == 'prod' || inputs.env == 'dr')) || (inputs.should_deploy_prod && (inputs.env == 'prod' || inputs.env == 'dr'))
+        uses: Consensys/kubernetes-action@master
+        if: (inputs.should_deploy && !(inputs.env == 'prod' || inputs.env == 'dr')) || (inputs.should_deploy_prod && (inputs.env == 'prod' || inputs.env == 'dr'))
         env:
           KUBE_CONFIG_DATA: ${{ env.KUBE_CONFIG_DATA }}
-        run: |
-          echo ${{ format('apply -f ./{0}/kubernetes.deployment.yml', env.APP_NAME) }}
-          cat ./$APP_NAME/kubernetes.deployment.yml
+        with:
+          args: ${{ format('apply -f ./{0}/kubernetes.deployment.yml', env.APP_NAME) }}
       - name: 🔒 Logout of Amazon ECR
         if: always()
         run: |
