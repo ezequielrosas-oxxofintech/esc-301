@@ -8,6 +8,9 @@ on:
       services:
         description: "Gradle services affected from last commit in json format for gha matrix"
         value: ${{ jobs.main.outputs.services }}
+      albs:
+        description: "Found alb manifest changes"
+        value: ${{ jobs.main.outputs.albs }}
     inputs:
       branch:
         required: true
