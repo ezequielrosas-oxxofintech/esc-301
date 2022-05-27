@@ -19,7 +19,7 @@ env:
 jobs:
   main:
     name: Calculate changed services
-    runs-on: self-hosted-back
+    runs-on: ubuntu-latest
     outputs:
       env: ${{ steps.main.outputs.env }}
       services: ${{ steps.main.outputs.services }}
