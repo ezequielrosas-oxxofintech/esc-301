@@ -1,4 +1,4 @@
-name: gradle build test
+name: Detect changed services
 on:
   workflow_call:
     outputs:
@@ -18,15 +18,13 @@ env:
 
 jobs:
   main:
-    name: Calculate changed services
+    name: Detect changed services
     runs-on: ubuntu-latest
     outputs:
       env: ${{ steps.main.outputs.env }}
       services: ${{ steps.main.outputs.services }}
       albs: ${{ steps.main.outputs.albs }}
     steps:
-      - run: |
-          echo $GITHUB_WORKSPACE
       - uses: actions/checkout@v2
         with:
           ref: ${{ inputs.branch }}
