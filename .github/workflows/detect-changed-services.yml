@@ -64,5 +64,5 @@ jobs:
             jq -MncR '[inputs]'
 
           printf %s '::set-output name=albs::'
-          awk "$LOAD_CHANGED_ALBS_AWK_SCRIPT" <<< '${{ steps.changed-files.outputs.all_changed_files }}' |
+          awk '-vRS=[[:space:]]' "$LOAD_CHANGED_ALBS_AWK_SCRIPT" <<< '${{ steps.changed-files.outputs.all_changed_files }}' |
             jq -MncR '[inputs] | map({alb_name: .})'
