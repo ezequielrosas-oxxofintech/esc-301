@@ -366,6 +366,7 @@ jobs:
           echo ./gradlew :${{ env.APP_NAME }}:build --refresh-dependencies
           env
       - name: 🔑 Configure AWS Credentials
+        if: inputs.should_deploy
         uses: fintechdigitalventure/configure-aws-credentials@master
         with:
           aws-access-key-id: ${{ secrets.AWS_DEPLOYER_ACCESS_KEY_ID }}
@@ -373,6 +374,10 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ env.DEPLOYMENT_ROLE }}
           role-duration-seconds: ${{ env.ROLE_DURATION_SECONDS }}
+      - name: 🔓 Login to Amazon ECR
+        if: inputs.should_deploy
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
       - name: Define env defaults
         env:
           SERVICE_VERSION: ${{ steps.build-service.outputs.SERVICE_VERSION }}
@@ -399,9 +404,25 @@ jobs:
           echo docker-compose build --no-cache $APP_NAME
           echo docker-compose push $APP_NAME
           env
+      - name: 📄 Inject environment variables into kubernetes manifest
+        uses: nowactions/envsubst@v1
+        with:
+          input: ${{ format('./{0}/kubernetes.yml', env.APP_NAME) }}
+          output: ${{ format('./{0}/kubernetes.deployment.yml', env.APP_NAME) }}
+        env:
+          XRAY_IMAGE: ${{ format('{0}/{1}/spin-xray:3.2.0', steps.login-ecr.outputs.registry, env.REPOSITORY) }}
+          LOGROTATE_IMAGE: ${{ format('{0}/{1}/spin-logrotate:latest', steps.login-ecr.outputs.registry, env.REPOSITORY) }}
+          FLUENT_BIT_IMAGE: ${{ format('{0}/{1}/spin-fluent-bit:2.23.0', steps.login-ecr.outputs.registry, env.REPOSITORY) }}
+          IMAGE_TAG: ${{ format('{0}/{1}{2}/{3}:{4}', steps.login-ecr.outputs.registry, env.PRODUCT_NAME, env.STAGE, env.APP_NAME, env.SERVICE_VERSION) }}
       - name: 🏢 Deploy micro-service to EKS
-        if: inputs.should_deploy
+        uses: Consensys/kubernetes-action@master
+        if: (inputs.should_deploy && !(inputs.env == 'prod' || inputs.env == 'dr')) || (inputs.should_deploy_prod && (inputs.env == 'prod' || inputs.env == 'dr'))
         env:
           KUBE_CONFIG_DATA: ${{ env.KUBE_CONFIG_DATA }}
         run: |
           echo ${{ format('apply -f ./{0}/kubernetes.deployment.yml', env.APP_NAME) }}
+      - name: 🔒 Logout of Amazon ECR
+        if: always()
+        run: |
+          docker system prune -a -f
+          docker logout $REGISTRY
