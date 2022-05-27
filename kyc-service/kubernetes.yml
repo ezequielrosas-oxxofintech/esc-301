@@ -1,0 +1,383 @@
+# ------------------- SERVICE ------------------- #
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${APP_NAME}
+  annotations:
+    alb.ingress.kubernetes.io/target-type: ip
+  labels:
+    app: ${APP_NAME}
+    stage: ${STAGE}
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 9010
+    - name: https
+      port: 443
+      targetPort: 9010
+  type: NodePort
+  selector:
+    app: ${APP_NAME}
+
+---
+# ------------------- HPA ------------------- #
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ${APP_NAME}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ${APP_NAME}
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 50
+
+---
+# ------------------- SERVICE ACCOUNT ------------------- #
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${STAGE}-eks-${APP_NAME}"
+  labels:
+    app.kubernetes.io/name: ${APP_NAME}
+  name: ${APP_NAME}
+
+---
+# ------------------- CLUSTER ROLE BINDING ------------------- #
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: ${APP_NAME}-fluentd-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fluentd-spring
+subjects:
+  - kind: ServiceAccount
+    name: ${APP_NAME}
+    namespace: ${STAGE}
+
+---
+# ------------------- DEPLOYMENT ------------------- #
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${APP_NAME}
+  labels:
+    app: ${APP_NAME}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 14
+  minReadySeconds: 30
+  progressDeadlineSeconds: 300
+  selector:
+    matchLabels:
+      app: ${APP_NAME}
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubernetes.io/change-cause: Build ${BUILD_SHA}
+      labels:
+        app: ${APP_NAME}
+    spec:
+      serviceAccountName: ${APP_NAME}
+      volumes:
+        - name: fluent-bit-config
+          configMap:
+            name: fluent-bit-config
+        - name: app-logs
+          emptyDir: {}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+      containers:
+        - image: ${IMAGE_TAG}
+          imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: /var/log/containers
+              name: app-logs
+          name: ${APP_NAME}
+          livenessProbe:
+            httpGet:
+              path: /${APP_NAME}/actuator/health
+              port: 9010
+            initialDelaySeconds: 50
+            timeoutSeconds: 2
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /${APP_NAME}/actuator/health
+              port: 9010
+            initialDelaySeconds: 50
+            timeoutSeconds: 2
+            periodSeconds: 5
+            failureThreshold: 60
+          resources:
+            requests:
+              cpu: ${APP_RESOURCES_CPU_REQUEST}
+              memory: ${APP_RESOURCES_MEMORY_REQUEST}
+            limits:
+              memory: ${APP_RESOURCES_MEMORY_LIMIT}
+          ports:
+            - containerPort: 9010
+              protocol: TCP
+          env:
+            - name: ENV
+              value: ${STAGE}
+            - name: PROFILES_LABEL
+              value: ${STAGE}
+            - name: BUILD_HASH
+              value: ${BUILD_SHA}
+            - name: TREND_AP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: trend-micron
+                  key: key-spin-backend-services
+            - name: TREND_AP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: trend-micron
+                  key: secret-spin-backend-services
+            - name: XHASH_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: xhash
+                  key: xhash-api-url
+            - name: XHASH_SECURE_CLIENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: xhash
+                  key: xhash-secure-client-token
+            - name: XHASH_CLIENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: xhash
+                  key: xhash-client-token
+            - name: XHASH_CLIENT_TIMEOUT
+              valueFrom:
+                secretKeyRef:
+                  name: xhash
+                  key: xhash-client-timeout
+                  optional: true
+            - name: AWS_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: aws-region
+            - name: AWS_COGNITO_JWKS
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: aws-cognito-jwks
+            - name: AWS_COGNITO_OAUTH2_TOKEN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: aws-cognito-oauth-token-url
+            - name: AWS_COGNITO_OAUTH2_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: kyc-service
+                  key: aws-cognito-oauth-token-client-id
+                  optional: true
+            - name: AWS_COGNITO_OAUTH2_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: kyc-service
+                  key: aws-cognito-oauth-token-client-secret
+                  optional: true
+            - name: PAGOPOP_SERVICE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: pagopop-service-api-key
+            - name: PAGOPOP_SERVICE_ADMIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: pagopop-service-admin-api-key
+            - name: MONGODB_READ_PREFERENCE
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: mongodb-read-preference
+                  optional: true
+            - name: MONGODB_URI_KYC
+              valueFrom:
+                secretKeyRef:
+                  name: kyc-service
+                  key: mongodb-kyc-uri
+            - name: SIMULATION_SERVICE_ENABLED
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: simulation-service-enabled-kyc
+                  optional: true
+            - name: SIMULATION_SERVICE_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: simulation-service-host
+                  optional: true
+            - name: KINESIS_STREAM_ENROLLMENT_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: kinesis
+                  key: kinesis-stream-enrollment-name
+            - name: KINESIS_STREAM_PROFILE_MANAGEMENT_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: kinesis
+                  key: kinesis-stream-profile-management-name
+            - name: KINESIS_STREAM_TRACK_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: kinesis
+                  key: kinesis-stream-track-name
+            - name: ACCOUNT_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: account-service-base-url
+            - name: FEATURE_CONFIGCAT_APIKEY
+              valueFrom:
+                secretKeyRef:
+                  name: feature-flags
+                  key: configcat-apikey
+            - name: FEATURE_CONFIGCAT_ENABLED
+              valueFrom:
+                secretKeyRef:
+                  name: feature-flags
+                  key: configcat-enabled
+            - name: FEATURE_CONFIGCAT_MEMORY_MAP
+              valueFrom:
+                secretKeyRef:
+                  name: feature-flags
+                  key: configcat-memory-map
+                  optional: true
+            - name: FEATURE_CACHE_ENABLED
+              valueFrom:
+                secretKeyRef:
+                  name: feature-flags
+                  key: feature-cache-enabled
+            - name: TUID_APIKEY
+              valueFrom:
+                secretKeyRef:
+                  name: tuidentidad
+                  key: api-key
+            - name: TUID_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: tuidentidad
+                  key: api-url
+            - name: TUID_CLIENT_TIMEOUT
+              valueFrom:
+                secretKeyRef:
+                  name: tuidentidad
+                  key: client-timeout-millis
+                  optional: true
+            - name: SPRING_REDIS_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: redis
+                  key: redis-host
+            - name: SPRING_REDIS_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: redis
+                  key: redis-port
+            - name: FACE_MATCH_SIMILARITY_THRESHOLD
+              valueFrom:
+                secretKeyRef:
+                  name: kyc-service
+                  key: face-match-similarity-threshold
+                  optional: true
+            - name: XHASH_IDENTITY_THRESHOLD
+              valueFrom:
+                secretKeyRef:
+                  name: kyc-service
+                  key: xhash-identity-threshold
+                  optional: true
+            - name: NOTIFICATION_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: notification-service-base-url
+
+        - name: logrotate
+          image: ${LOGROTATE_IMAGE}
+          securityContext:
+            runAsUser: 0
+          resources:
+            requests:
+              cpu: ${LOGROTATE_RESOURCES_CPU_REQUEST}
+              memory: ${LOGROTATE_RESOURCES_MEMORY_REQUEST}
+            limits:
+              cpu: ${LOGROTATE_RESOURCES_CPU_LIMIT}
+              memory: ${LOGROTATE_RESOURCES_MEMORY_LIMIT}             
+          volumeMounts:
+            - mountPath: /var/log/containers
+              name: app-logs
+          env:
+            - name: CRON_EXPR
+              value: "*/15 * * * *"
+            - name: LOGROTATE_LOGFILES
+              value: "/var/log/containers/*.log"
+            - name: LOGROTATE_FILESIZE
+              value: "50M"
+            - name: LOGROTATE_FILENUM
+              value: "5"
+        - name: fluent-bit
+          image: ${FLUENT_BIT_IMAGE}
+          securityContext:
+            runAsUser: 0
+          env:
+            - name: AWS_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: aws-region
+            - name: CLUSTER_NAME
+              value: ${STAGE}-eks-master-cluster
+            - name: HTTP_SERVER
+              value: "On"
+            - name: HTTP_PORT
+              value: "2020"
+            - name: READ_FROM_HEAD
+              value: "true"
+            - name: READ_FROM_TAIL
+              value: "true"
+            - name: APP_NAME
+              value: ${APP_NAME}
+            - name: STAGE
+              value: ${STAGE}
+            - name: CI_VERSION
+              value: "k8s/1.3.9"
+          resources:
+            limits:
+              cpu: ${FLUENT_BIT_RESOURCES_CPU_LIMIT}
+              memory: ${FLUENT_BIT_RESOURCES_MEMORY_LIMIT}
+            requests:
+              cpu: ${FLUENT_BIT_RESOURCES_CPU_REQUEST}
+              memory: ${FLUENT_BIT_RESOURCES_MEMORY_REQUEST}
+          volumeMounts:
+            - name: fluent-bit-config
+              mountPath: /fluent-bit/etc/
+            - name: app-logs
+              mountPath: /var/log/containers
+
+
+
+

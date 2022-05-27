@@ -1,0 +1,159 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${APP_NAME}
+  labels:
+    app: ${APP_NAME}
+    stage: ${STAGE}
+spec:
+  template:
+    spec:
+      containers:
+        - name: ${APP_NAME}
+          image: ${IMAGE_TAG}
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: ${APP_RESOURCES_CPU_REQUEST}
+              memory: ${APP_RESOURCES_MEMORY_REQUEST}
+            limits:
+              memory: ${APP_RESOURCES_MEMORY_LIMIT}          
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: ${JOB}
+            - name: JOB_INPUT_PARAMS
+              value: ${JOB_INPUT_PARAMS}
+            - name: ENV
+              value: ${STAGE}
+            - name: PROFILES_LABEL
+              value: ${STAGE}
+            - name: BUILD_HASH
+              value: ${BUILD_SHA}
+            - name: TREND_AP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: trend-micron
+                  key: key-spin-backend-services
+            - name: TREND_AP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: trend-micron
+                  key: secret-spin-backend-services
+            - name: MONGODB_READ_PREFERENCE
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: mongodb-read-preference
+                  optional: true
+            - name: MONGODB_URI_ACCOUNT
+              valueFrom:
+                secretKeyRef:
+                  name: account-service
+                  key: mongodb-account-uri
+            - name: MONGODB_URI_CATALOGUE
+              valueFrom:
+                secretKeyRef:
+                  name: catalogue-service
+                  key: mongodb-catalogue-uri
+            - name: MONGODB_URI_CARD
+              valueFrom:
+                secretKeyRef:
+                  name: card-service
+                  key: mongodb-card-uri
+            - name: MONGODB_URI_TRANSACTION
+              valueFrom:
+                secretKeyRef:
+                  name: transaction-service
+                  key: mongodb-transaction-uri
+            - name: AVATAR_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: avatar-base-url
+            - name: AVATAR_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: avatar-secret
+            - name: REFERRAL_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: referral-service-base-url
+            - name: PAGOPOP_SERVICE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: pagopop-service-api-key
+            - name: SPEI_TRANSACTION_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: spei-transaction-service-base-url
+            - name: EXTERNAL_CASHIN_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: external-cashin-service-base-url
+            - name: FISERV_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: fiserv
+                  key: fiserv-api-url
+            - name: FISERV_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: fiserv
+                  key: fiserv-api-key
+            - name: FISERV_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: fiserv
+                  key: fiserv-client-secret
+            - name: FISERV_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: fiserv
+                  key: fiserv-client-id
+            - name: FISERV_SIGNATURE
+              valueFrom:
+                secretKeyRef:
+                  name: fiserv
+                  key: fiserv-signature
+            - name: ACCOUNT_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: account-service-base-url
+            - name: KYC_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: kyc-service-base-url
+            - name: LOYALTY_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: loyalty-service-base-url
+            - name: CARD_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: card-service-base-url
+            - name: SPRING_REDIS_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: redis
+                  key: redis-host
+            - name: SPRING_REDIS_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: redis
+                  key: redis-port
+            - name: AWS_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: aws-region
+      restartPolicy: Never
+  backoffLimit: 4
