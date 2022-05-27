@@ -59,9 +59,9 @@ jobs:
           printf %s '::set-output name=services::'
           comm -12 <(
             awk "$LOAD_DEFAULT_SERVICES_AWK_SCRIPT" settings.gradle | sort) <(
-            awk '-vRS=[[:space:]]' -F/ '{print $1}' <<< '${{ steps.changed-projects.outputs.all_changed_files }}' | sort) |
+            awk '-vRS=[[:space:]]' -F/ '{print $1}' <<< '${{ steps.changed-files.outputs.all_changed_files }}' | sort) |
             jq -MncR '[inputs]'
 
           printf %s '::set-output name=albs::'
-          awk "$LOAD_CHANGED_ALBS_AWK_SCRIPT" <<< '${{ steps.changed-load-balancers.outputs.all_changed_files }}' |
+          awk "$LOAD_CHANGED_ALBS_AWK_SCRIPT" <<< '${{ steps.changed-files.outputs.all_changed_files }}' |
             jq -MncR '[inputs] | map({alb_name: .})'
