@@ -1,0 +1,65 @@
+name: gradle build test
+on:
+  workflow_call:
+    outputs:
+      env:
+        description: "Environment that corresponds to given branch"
+        value: ${{ jobs.main.outputs.env }}
+      services:
+        description: "Gradle services affected from last commit in json format for gha matrix"
+        value: ${{ jobs.main.outputs.services }}
+    inputs:
+      branch:
+        required: true
+        type: string
+
+env:
+  ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+
+jobs:
+  main:
+    name: Calculate changed services
+    runs-on: self-hosted-back
+    outputs:
+      env: ${{ steps.main.outputs.env }}
+      services: ${{ steps.main.outputs.services }}
+      albs: ${{ steps.main.outputs.albs }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 2
+      - name: 🗂 Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v17.2
+      - name: 🗂 Get changed projects
+        id: main
+        env:
+          LOAD_CHANGED_ALBS_AWK_SCRIPT: |
+            BEGIN {FS="kubernetes/alb/|.yml"}   # alb filepaths start with kubernetes/alb/ and end with .yml
+            $2 == "" {next}                     # ignore lines that did not match
+            {print $2}                          # alb name is between the delimiters from the first line
+          LOAD_DEFAULT_SERVICES_AWK_SCRIPT: |
+            BEGIN {FS="'"}              # subproject names are surrounded by single quotes
+            $1 !~ "include"      {next} # subprojects are denoted by include command
+            $2 == "core"         {next} # core subproject is a library, not a microservice, skip.
+            $2 == "service-creator-gradle-plugin" {next} # template, not a microservice, skip.
+            {print $2}
+        run: |
+          bin=$(mktemp -d)
+          export PATH="$bin:$PATH"
+          wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -O "$bin/jq" --quiet
+          chmod +x "$bin/jq"
+
+          printf %s '::set-output name=env::'
+          jq -rne '{master: "dev", qa: "qa", prod: "prod", dr: "dr"} | .[$branch] // "feature-branch"' --arg branch '${{ github.ref_name }}'
+
+          printf %s '::set-output name=services::'
+          comm -12 <(
+            awk "$LOAD_DEFAULT_SERVICES_AWK_SCRIPT" settings.gradle | sort) <(
+            awk '-vRS=[[:space:]]' -F/ '{print $1}' <<< '${{ steps.changed-projects.outputs.all_changed_files }}' | sort) |
+            jq -MncR '[inputs]'
+
+          printf %s '::set-output name=albs::'
+          awk "$LOAD_CHANGED_ALBS_AWK_SCRIPT" <<< '${{ steps.changed-load-balancers.outputs.all_changed_files }}' |
+            jq -MncR '[inputs] | map({alb_name: .})'
