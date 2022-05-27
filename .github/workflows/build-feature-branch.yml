@@ -25,4 +25,4 @@ jobs:
           services: ${{ needs.build_matrix.outputs.services }}
           albs: ${{ needs.build_matrix.outputs.albs }}
         run: |
-          env
+          printenv env branch services albs
