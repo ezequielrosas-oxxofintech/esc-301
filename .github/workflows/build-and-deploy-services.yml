@@ -1,0 +1,428 @@
+name: gradle build test
+on:
+  workflow_call:
+    secrets:
+      AWS_DEPLOYER_ACCESS_KEY_ID:
+        required: true
+      AWS_DEPLOYER_SECRET_ACCESS_KEY:
+        required: true
+      DEV_ALB_CONEKTA_ACM_ARN:
+        required: true
+      DEV_ALB_POS_ISO_ACM_ARN:
+        required: true
+      DEV_ALB_STP_ACM_ARN:
+        required: true
+      DEV_ALB_SUPPORT_API_CHANNEL_ACM_ARN:
+        required: true
+      DEV_ALB_TELEPERFORMANCE_ACM_ARN:
+        required: true
+      DEV_ALB_TRANS_NETWORK_ACM_ARN:
+        required: true
+      DEV_ALB_XHASH_ACM_ARN:
+        required: true
+      DEV_AWS_ACCOUNT_ID:
+        required: true
+      DEV_DEPLOYMENT_ROLE:
+        required: true
+      DEV_HSM_IP:
+        required: true
+      DEV_KUBE_CONFIG_DATA:
+        required: true
+      DEV_VPC_ID:
+        required: true
+      DR_ALB_CONEKTA_ACM_ARN:
+        required: true
+      DR_ALB_POS_ISO_ACM_ARN:
+        required: true
+      DR_ALB_STP_ACM_ARN:
+        required: true
+      DR_ALB_SUPPORT_API_CHANNEL_ACM_ARN:
+        required: true
+      DR_ALB_TELEPERFORMANCE_ACM_ARN:
+        required: true
+      DR_ALB_TRANS_NETWORK_ACM_ARN:
+        required: true
+      DR_ALB_XHASH_ACM_ARN:
+        required: true
+      DR_HSM_IP:
+        required: true
+      DR_KUBE_CONFIG_DATA:
+        required: true
+      DR_VPC_ID:
+        required: true
+      PACKAGE_TOKEN:
+        required: true
+      PACKAGE_USERNAME:
+        required: true
+      PROD_ALB_CONEKTA_ACM_ARN:
+        required: true
+      PROD_ALB_POS_ISO_ACM_ARN:
+        required: true
+      PROD_ALB_STP_ACM_ARN:
+        required: true
+      PROD_ALB_SUPPORT_API_CHANNEL_ACM_ARN:
+        required: true
+      PROD_ALB_TELEPERFORMANCE_ACM_ARN:
+        required: true
+      PROD_ALB_TRANS_NETWORK_ACM_ARN:
+        required: true
+      PROD_ALB_XHASH_ACM_ARN:
+        required: true
+      PROD_AWS_ACCOUNT_ID:
+        required: true
+      PROD_DEPLOYMENT_ROLE:
+        required: true
+      PROD_HSM_IP:
+        required: true
+      PROD_KUBE_CONFIG_DATA:
+        required: true
+      PROD_VPC_ID:
+        required: true
+      QA_ALB_CONEKTA_ACM_ARN:
+        required: true
+      QA_ALB_POS_ISO_ACM_ARN:
+        required: true
+      QA_ALB_STP_ACM_ARN:
+        required: true
+      QA_ALB_SUPPORT_API_CHANNEL_ACM_ARN:
+        required: true
+      QA_ALB_TELEPERFORMANCE_ACM_ARN:
+        required: true
+      QA_ALB_TRANS_NETWORK_ACM_ARN:
+        required: true
+      QA_ALB_XHASH_ACM_ARN:
+        required: true
+      QA_AWS_ACCOUNT_ID:
+        required: true
+      QA_DEPLOYMENT_ROLE:
+        required: true
+      QA_HSM_IP:
+        required: true
+      QA_KUBE_CONFIG_DATA:
+        required: true
+      QA_VPC_ID:
+        required: true
+      STAGING_ALB_CONEKTA_ACM_ARN:
+        required: true
+      STAGING_ALB_POS_ISO_ACM_ARN:
+        required: true
+      STAGING_ALB_STP_ACM_ARN:
+        required: true
+      STAGING_ALB_SUPPORT_API_CHANNEL_ACM_ARN:
+        required: true
+      STAGING_ALB_TELEPERFORMANCE_ACM_ARN:
+        required: true
+      STAGING_ALB_TRANS_NETWORK_ACM_ARN:
+        required: true
+      STAGING_ALB_XHASH_ACM_ARN:
+        required: true
+      STAGING_HSM_IP:
+        required: true
+      STAGING_KUBE_CONFIG_DATA:
+        required: true
+      STAGING_VPC_ID:
+        required: true
+      PROD_KEY:
+        required: true
+    inputs:
+      env:
+        required: true
+        type: string
+      branch:
+        required: true
+        type: string
+      should_deploy:
+        required: true
+        type: boolean
+      should_deploy_prod:
+        required: true
+        type: boolean
+      services:
+        required: true
+        type: string
+
+jobs:
+  build_and_deploy:
+    name: ${{ matrix.app_name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app_name: ${{ fromJson(inputs.services) }}
+    env:
+      APP_NAME: ${{ matrix.app_name }}
+      PRODUCT_NAME: pagopop
+      ROLE_DURATION_SECONDS: 1200
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+    steps:
+      - name: Set DEV environment variables
+        if: inputs.env == 'dev'
+        env:
+          JAVA_OPTS: "-Xmx400m -Xms250m -XX:MaxMetaspaceSize=200m -XX:MetaspaceSize=130m -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps  -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=1m -Xloggc:/var/log/containers/gc-%t.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/containers"
+        run: |
+          echo "::set-env name=AWS_REGION::us-east-1"
+          echo "::set-env name=STAGE::dev"
+          echo "::set-env name=REPOSITORY::pagopopdev"
+          echo "::set-env name=HSM_IP::${{ secrets.DEV_HSM_IP }}"
+          echo "::set-env name=DYNATRACE_ENABLED::false"
+          echo "::set-env name=DEBUG_OPTS::${{ env.JAVA_OPTS }}"
+          echo "::set-env name=DEPLOYMENT_ROLE::${{ secrets.DEV_DEPLOYMENT_ROLE }}"
+          echo "::set-env name=AWS_ACCOUNT_ID::${{ secrets.DEV_AWS_ACCOUNT_ID }}"
+          echo "::set-env name=KUBE_CONFIG_DATA::${{ secrets.DEV_KUBE_CONFIG_DATA }}"
+          echo "::set-env name=VPC_ID::${{ secrets.DEV_VPC_ID }}"
+          echo "::set-env name=ALB_STP_ACM_ARN::${{ secrets.DEV_ALB_STP_ACM_ARN}}"
+          echo "::set-env name=ALB_CONEKTA_ACM_ARN::${{ secrets.DEV_ALB_CONEKTA_ACM_ARN}}"
+          echo "::set-env name=ALB_XHASH_ACM_ARN::${{ secrets.DEV_ALB_XHASH_ACM_ARN}}"
+          echo "::set-env name=ALB_POS_ISO_ACM_ARN::${{ secrets.DEV_ALB_POS_ISO_ACM_ARN }}"
+          echo "::set-env name=ALB_TELEPERFORMANCE_ACM_ARN::${{ secrets.DEV_ALB_TELEPERFORMANCE_ACM_ARN }}"
+          echo "::set-env name=ALB_SUPPORT_API_CHANNEL_ACM_ARN::${{ secrets.DEV_ALB_SUPPORT_API_CHANNEL_ACM_ARN }}"
+          echo "::set-env name=ALB_TRANS_NETWORK_ACM_ARN::${{ secrets.DEV_ALB_TRANS_NETWORK_ACM_ARN }}"
+          echo "::set-env name=EKS_CLUSTER_NAME=pagopop-dev-eks-master-cluster"
+          echo "::set-env name=APP_RESOURCES_MEMORY_LIMIT::800Mi"
+          echo "::set-env name=APP_RESOURCES_MEMORY_REQUEST::512Mi"
+          echo "::set-env name=APP_RESOURCES_CPU_REQUEST::200m"
+          echo "::set-env name=FLUENT_ADMIN_RESOURCES_CPU_REQUEST::1000m"
+          echo "::set-env name=FLUENTD_RESOURCES_MEMORY_LIMIT::300Mi"
+          echo "::set-env name=FLUENTD_RESOURCES_MEMORY_REQUEST::200Mi"
+          echo "::set-env name=FLUENTD_RESOURCES_CPU_LIMIT::200m"
+          echo "::set-env name=FLUENTD_RESOURCES_CPU_REQUEST::100m"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_MEMORY_LIMIT::200Mi"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_MEMORY_REQUEST::100Mi"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_CPU_LIMIT::700m"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_CPU_REQUEST::500m"
+          echo "::set-env name=LOGROTATE_RESOURCES_MEMORY_LIMIT::32Mi"
+          echo "::set-env name=LOGROTATE_RESOURCES_MEMORY_REQUEST::16Mi"
+          echo "::set-env name=LOGROTATE_RESOURCES_CPU_LIMIT::100m"
+          echo "::set-env name=LOGROTATE_RESOURCES_CPU_REQUEST::50m"
+      - name: Set QA environment variables
+        if: inputs.env == 'qa'
+        env:
+          JAVA_OPTS: "-Xmx400m -Xms250m -XX:MaxMetaspaceSize=200m -XX:MetaspaceSize=130m -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps  -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=1m -Xloggc:/var/log/containers/gc-%t.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/containers"
+        run: |
+          echo "::set-env name=AWS_REGION::us-east-1"
+          echo "::set-env name=STAGE::qa"
+          echo "::set-env name=REPOSITORY::pagopopqa"
+          echo "::set-env name=HSM_IP::${{ secrets.QA_HSM_IP }}"
+          echo "::set-env name=DYNATRACE_ENABLED::false"
+          echo "::set-env name=DEBUG_OPTS::${{ env.JAVA_OPTS }}"
+          echo "::set-env name=DEPLOYMENT_ROLE::${{ secrets.QA_DEPLOYMENT_ROLE }}"
+          echo "::set-env name=AWS_ACCOUNT_ID::${{ secrets.QA_AWS_ACCOUNT_ID }}"
+          echo "::set-env name=KUBE_CONFIG_DATA::${{ secrets.QA_KUBE_CONFIG_DATA }}"
+          echo "::set-env name=VPC_ID::${{ secrets.QA_VPC_ID }}"
+          echo "::set-env name=ALB_STP_ACM_ARN::${{ secrets.QA_ALB_STP_ACM_ARN}}"
+          echo "::set-env name=ALB_CONEKTA_ACM_ARN::${{ secrets.QA_ALB_CONEKTA_ACM_ARN}}"
+          echo "::set-env name=ALB_XHASH_ACM_ARN::${{ secrets.QA_ALB_XHASH_ACM_ARN}}"
+          echo "::set-env name=ALB_POS_ISO_ACM_ARN::${{ secrets.QA_ALB_POS_ISO_ACM_ARN }}"
+          echo "::set-env name=ALB_TELEPERFORMANCE_ACM_ARN::${{ secrets.QA_ALB_TELEPERFORMANCE_ACM_ARN }}"
+          echo "::set-env name=ALB_SUPPORT_API_CHANNEL_ACM_ARN::${{ secrets.QA_ALB_SUPPORT_API_CHANNEL_ACM_ARN }}"
+          echo "::set-env name=ALB_TRANS_NETWORK_ACM_ARN::${{ secrets.QA_ALB_TRANS_NETWORK_ACM_ARN }}"
+          echo "::set-env name=EKS_CLUSTER_NAME=pagopop-qa-eks-master-cluster"
+          echo "::set-env name=APP_RESOURCES_MEMORY_LIMIT::800Mi"
+          echo "::set-env name=APP_RESOURCES_MEMORY_REQUEST::512Mi"
+          echo "::set-env name=APP_RESOURCES_CPU_REQUEST::200m"
+          echo "::set-env name=FLUENT_ADMIN_RESOURCES_CPU_REQUEST::1000m"
+          echo "::set-env name=FLUENTD_RESOURCES_MEMORY_LIMIT::300Mi"
+          echo "::set-env name=FLUENTD_RESOURCES_MEMORY_REQUEST::200Mi"
+          echo "::set-env name=FLUENTD_RESOURCES_CPU_LIMIT::200m"
+          echo "::set-env name=FLUENTD_RESOURCES_CPU_REQUEST::100m"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_MEMORY_LIMIT::200Mi"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_MEMORY_REQUEST::100Mi"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_CPU_LIMIT::700m"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_CPU_REQUEST::500m"
+          echo "::set-env name=LOGROTATE_RESOURCES_MEMORY_LIMIT::32Mi"
+          echo "::set-env name=LOGROTATE_RESOURCES_MEMORY_REQUEST::16Mi"
+          echo "::set-env name=LOGROTATE_RESOURCES_CPU_LIMIT::100m"
+          echo "::set-env name=LOGROTATE_RESOURCES_CPU_REQUEST::50m"
+      - name: Set Staging environment variables
+        if: inputs.env == 'staging'
+        env:
+          JAVA_OPTS: "-Xmx750m -Xms500m -XX:MaxMetaspaceSize=300m -XX:MetaspaceSize=200m -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps  -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=10m -Xloggc:/var/log/containers/gc-%t.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/containers"
+        run: |
+          echo "::set-env name=AWS_REGION::us-east-1"
+          echo "::set-env name=STAGE::staging"
+          echo "::set-env name=REPOSITORY::pagopopstaging"
+          echo "::set-env name=HSM_IP::${{ secrets.STAGING_HSM_IP }}"
+          echo "::set-env name=DYNATRACE_ENABLED::false"
+          echo "::set-env name=DEBUG_OPTS::${{ env.JAVA_OPTS }}"
+          echo "::set-env name=DEPLOYMENT_ROLE::${{ secrets.QA_DEPLOYMENT_ROLE }}"
+          echo "::set-env name=AWS_ACCOUNT_ID::${{ secrets.QA_AWS_ACCOUNT_ID }}"
+          echo "::set-env name=KUBE_CONFIG_DATA::${{ secrets.STAGING_KUBE_CONFIG_DATA }}"
+          echo "::set-env name=VPC_ID::${{ secrets.STAGING_VPC_ID }}"
+          echo "::set-env name=ALB_STP_ACM_ARN::${{ secrets.STAGING_ALB_STP_ACM_ARN}}"
+          echo "::set-env name=ALB_CONEKTA_ACM_ARN::${{ secrets.STAGING_ALB_CONEKTA_ACM_ARN}}"
+          echo "::set-env name=ALB_XHASH_ACM_ARN::${{ secrets.STAGING_ALB_XHASH_ACM_ARN}}"
+          echo "::set-env name=ALB_POS_ISO_ACM_ARN::${{ secrets.STAGING_ALB_POS_ISO_ACM_ARN }}"
+          echo "::set-env name=ALB_TELEPERFORMANCE_ACM_ARN::${{ secrets.STAGING_ALB_TELEPERFORMANCE_ACM_ARN }}"
+          echo "::set-env name=ALB_SUPPORT_API_CHANNEL_ACM_ARN::${{ secrets.STAGING_ALB_SUPPORT_API_CHANNEL_ACM_ARN }}"
+          echo "::set-env name=ALB_TRANS_NETWORK_ACM_ARN::${{ secrets.STAGING_ALB_TRANS_NETWORK_ACM_ARN }}"
+          echo "::set-env name=EKS_CLUSTER_NAME=pagopop-staging-eks-master-cluster"
+          echo "::set-env name=APP_RESOURCES_MEMORY_LIMIT::1500Mi"
+          echo "::set-env name=APP_RESOURCES_MEMORY_REQUEST::1000Mi"
+          echo "::set-env name=APP_RESOURCES_CPU_REQUEST::1000m"
+          echo "::set-env name=FLUENT_ADMIN_RESOURCES_CPU_REQUEST::1000m"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_MEMORY_LIMIT::300Mi"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_MEMORY_REQUEST::200Mi"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_CPU_LIMIT::1000m"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_CPU_REQUEST::500m"
+          echo "::set-env name=LOGROTATE_RESOURCES_MEMORY_LIMIT::32Mi"
+          echo "::set-env name=LOGROTATE_RESOURCES_MEMORY_REQUEST::16Mi"
+          echo "::set-env name=LOGROTATE_RESOURCES_CPU_LIMIT::100m"
+          echo "::set-env name=LOGROTATE_RESOURCES_CPU_REQUEST::50m"
+      - name: Set PROD environment variables
+        if: inputs.env == 'prod' && inputs.should_deploy_prod
+        env:
+          JAVA_OPTS: "-Xmx750m -Xms500m -XX:MaxMetaspaceSize=300m -XX:MetaspaceSize=200m -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps  -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=10m -Xloggc:/var/log/containers/gc-%t.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/containers"
+        run: |
+          echo "::set-env name=AWS_REGION::us-east-1"
+          echo "::set-env name=STAGE::prod"
+          echo "::set-env name=REPOSITORY::pagopopprod"
+          echo "::set-env name=HSM_IP::${{ secrets.PROD_HSM_IP }}"
+          echo "::set-env name=DYNATRACE_ENABLED::true"
+          echo "::set-env name=DEBUG_OPTS::${{ env.JAVA_OPTS }}"
+          echo "::set-env name=DEPLOYMENT_ROLE::${{ secrets.PROD_DEPLOYMENT_ROLE }}"
+          echo "::set-env name=AWS_ACCOUNT_ID::${{ secrets.PROD_AWS_ACCOUNT_ID }}"
+          echo "::set-env name=KUBE_CONFIG_DATA::${{ secrets.PROD_KUBE_CONFIG_DATA }}"
+          echo "::set-env name=VPC_ID::${{ secrets.PROD_VPC_ID }}"
+          echo "::set-env name=ALB_STP_ACM_ARN::${{ secrets.PROD_ALB_STP_ACM_ARN}}"
+          echo "::set-env name=ALB_CONEKTA_ACM_ARN::${{ secrets.PROD_ALB_CONEKTA_ACM_ARN}}"
+          echo "::set-env name=ALB_XHASH_ACM_ARN::${{ secrets.PROD_ALB_XHASH_ACM_ARN}}"
+          echo "::set-env name=ALB_POS_ISO_ACM_ARN::${{ secrets.PROD_ALB_POS_ISO_ACM_ARN }}"
+          echo "::set-env name=ALB_TELEPERFORMANCE_ACM_ARN::${{ secrets.PROD_ALB_TELEPERFORMANCE_ACM_ARN }}"
+          echo "::set-env name=ALB_SUPPORT_API_CHANNEL_ACM_ARN::${{ secrets.PROD_ALB_SUPPORT_API_CHANNEL_ACM_ARN }}"
+          echo "::set-env name=ALB_TRANS_NETWORK_ACM_ARN::${{ secrets.PROD_ALB_TRANS_NETWORK_ACM_ARN }}"
+          echo "::set-env name=EKS_CLUSTER_NAME=pagopop-prod-eks-master-cluster"
+          echo "::set-env name=APP_RESOURCES_MEMORY_LIMIT::1500Mi"
+          echo "::set-env name=APP_RESOURCES_MEMORY_REQUEST::1000Mi"
+          echo "::set-env name=APP_RESOURCES_CPU_REQUEST::1000m"
+          echo "::set-env name=FLUENT_ADMIN_RESOURCES_CPU_REQUEST::1000m"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_MEMORY_LIMIT::300Mi"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_MEMORY_REQUEST::200Mi"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_CPU_LIMIT::1000m"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_CPU_REQUEST::500m"
+          echo "::set-env name=LOGROTATE_RESOURCES_MEMORY_LIMIT::64Mi"
+          echo "::set-env name=LOGROTATE_RESOURCES_MEMORY_REQUEST::32Mi"
+          echo "::set-env name=LOGROTATE_RESOURCES_CPU_LIMIT::200m"
+          echo "::set-env name=LOGROTATE_RESOURCES_CPU_REQUEST::100m"
+      - name: Set DR environment variables
+        if: inputs.env == 'dr' && inputs.should_deploy_prod
+        env:
+          JAVA_OPTS: "-Xmx700m -Xms500m -XX:MaxMetaspaceSize=300m -XX:MetaspaceSize=200m -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps  -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=10m -Xloggc:/var/log/containers/gc-%t.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/containers"
+        run: |
+          echo "::set-env name=AWS_REGION::sa-east-1"
+          echo "::set-env name=STAGE::dr"
+          echo "::set-env name=REPOSITORY::pagopopdr"
+          echo "::set-env name=HSM_IP::${{ secrets.DR_HSM_IP }}"
+          echo "::set-env name=DYNATRACE_ENABLED::false"
+          echo "::set-env name=SECONDARY_DYNATRACE_ENABLED::false"
+          echo "::set-env name=DEBUG_OPTS::${{ env.JAVA_OPTS }}"
+          echo "::set-env name=DEPLOYMENT_ROLE::${{ secrets.PROD_DEPLOYMENT_ROLE }}"
+          echo "::set-env name=AWS_ACCOUNT_ID::${{ secrets.PROD_AWS_ACCOUNT_ID }}"
+          echo "::set-env name=KUBE_CONFIG_DATA::${{ secrets.DR_KUBE_CONFIG_DATA }}"
+          echo "::set-env name=VPC_ID::${{ secrets.DR_VPC_ID }}"
+          echo "::set-env name=ALB_STP_ACM_ARN::${{ secrets.DR_ALB_STP_ACM_ARN}}"
+          echo "::set-env name=ALB_CONEKTA_ACM_ARN::${{ secrets.DR_ALB_CONEKTA_ACM_ARN}}"
+          echo "::set-env name=ALB_XHASH_ACM_ARN::${{ secrets.DR_ALB_XHASH_ACM_ARN}}"
+          echo "::set-env name=ALB_POS_ISO_ACM_ARN::${{ secrets.DR_ALB_POS_ISO_ACM_ARN }}"
+          echo "::set-env name=ALB_TELEPERFORMANCE_ACM_ARN::${{ secrets.DR_ALB_TELEPERFORMANCE_ACM_ARN }}"
+          echo "::set-env name=ALB_SUPPORT_API_CHANNEL_ACM_ARN::${{ secrets.DR_ALB_SUPPORT_API_CHANNEL_ACM_ARN }}"
+          echo "::set-env name=ALB_TRANS_NETWORK_ACM_ARN::${{ secrets.DR_ALB_TRANS_NETWORK_ACM_ARN }}"
+          echo "::set-env name=EKS_CLUSTER_NAME=pagopop-dr-eks-master-cluster"
+          echo "::set-env name=APP_RESOURCES_MEMORY_LIMIT::1500Mi"
+          echo "::set-env name=APP_RESOURCES_MEMORY_REQUEST::1000Mi"
+          echo "::set-env name=APP_RESOURCES_CPU_REQUEST::1000m"
+          echo "::set-env name=FLUENT_ADMIN_RESOURCES_CPU_REQUEST::1000m"
+          echo "::set-env name=FLUENTD_RESOURCES_MEMORY_LIMIT::800Mi"
+          echo "::set-env name=FLUENTD_RESOURCES_MEMORY_REQUEST::400Mi"
+          echo "::set-env name=FLUENTD_RESOURCES_CPU_LIMIT::400m"
+          echo "::set-env name=FLUENTD_RESOURCES_CPU_REQUEST::200m"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_MEMORY_LIMIT::300Mi"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_MEMORY_REQUEST::200Mi"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_CPU_LIMIT::1000m"
+          echo "::set-env name=FLUENT_BIT_RESOURCES_CPU_REQUEST::500m"
+          echo "::set-env name=XRAY_RESOURCES_MEMORY_LIMIT::128Mi"
+          echo "::set-env name=XRAY_RESOURCES_MEMORY_REQUEST::64Mi"
+          echo "::set-env name=XRAY_RESOURCES_CPU_LIMIT::400m"
+          echo "::set-env name=XRAY_RESOURCES_CPU_REQUEST::200m"
+          echo "::set-env name=LOGROTATE_RESOURCES_MEMORY_LIMIT::64Mi"
+          echo "::set-env name=LOGROTATE_RESOURCES_MEMORY_REQUEST::32Mi"
+          echo "::set-env name=LOGROTATE_RESOURCES_CPU_LIMIT::200m"
+          echo "::set-env name=LOGROTATE_RESOURCES_CPU_REQUEST::100m"
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+      - name: ☕ Set up Java
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'temurin'
+          java-version: 8
+      - name: 🐘 Build Repository With Gradle
+        id: build-service
+        env:
+          GRADLE_OPTS: -Xmx2000m -XX:MaxPermSize=256m -Dorg.gradle.jvmargs='-Xmx2048m -XX:MaxPermSize=256m'
+          PACKAGE_USERNAME: ${{ secrets.PACKAGE_USERNAME }}
+          PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
+        run: |
+          ./gradlew :${{ env.APP_NAME }}:build --refresh-dependencies
+      - name: 🔑 Configure AWS Credentials
+        if: inputs.should_deploy
+        uses: fintechdigitalventure/configure-aws-credentials@master
+        with:
+          aws-access-key-id: ${{ secrets.AWS_DEPLOYER_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_DEPLOYER_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.DEPLOYMENT_ROLE }}
+          role-duration-seconds: ${{ env.ROLE_DURATION_SECONDS }}
+      - name: 🔓 Login to Amazon ECR
+        if: inputs.should_deploy
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+      - name: Define env defaults
+        env:
+          SERVICE_VERSION: ${{ steps.build-service.outputs.SERVICE_VERSION }}
+        run: |
+          BUILD_SHA="$(git rev-parse HEAD)"
+          : "${BUILD_SHA:?failed retrieving git commit hash}"
+          SERVICE_VERSION="${SERVICE_VERSION:-$BUILD_SHA}"
+          echo "::set-env name=SERVICE_VERSION::$SERVICE_VERSION"
+          echo "::set-env name=BUILD_SHA::$BUILD_SHA"
+      - name: 🏗️ Build, Tag, and Push Images to Amazon ECR
+        if: inputs.should_deploy
+        env:
+          SERVICE_VERSION: ${{ env.SERVICE_VERSION }}
+          IMAGE_TAG: ${{ env.SERVICE_VERSION }}
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          DOCKER_BUILD_TARGET: ${{ env.DOCKER_BUILD_TARGET }}
+          BASE_IMAGE: ${{ format('{0}/{1}/pagopop-service:dynatrace', steps.login-ecr.outputs.registry, env.REPOSITORY) }}
+          BASE_IMAGE_SECURITY: ${{ format('{0}/{1}/spin-security-service:dynatrace', steps.login-ecr.outputs.registry, env.REPOSITORY) }}
+          HSM_IP: ${{ env.HSM_IP }}
+          DYNATRACE_ENABLED: ${{ env.DYNATRACE_ENABLED }}
+          APP_NAME: ${{ env.APP_NAME }}
+        run: |
+          docker pull $BASE_IMAGE
+          docker pull $BASE_IMAGE_SECURITY
+          docker-compose build --no-cache $APP_NAME
+          docker-compose push $APP_NAME
+      - name: 📄 Inject environment variables into kubernetes manifest
+        if: inputs.should_deploy
+        uses: nowactions/envsubst@v1
+        with:
+          input: ${{ format('./{0}/kubernetes.yml', env.APP_NAME) }}
+          output: ${{ format('./{0}/kubernetes.deployment.yml', env.APP_NAME) }}
+        env:
+          XRAY_IMAGE: ${{ format('{0}/{1}/spin-xray:3.2.0', steps.login-ecr.outputs.registry, env.REPOSITORY) }}
+          LOGROTATE_IMAGE: ${{ format('{0}/{1}/spin-logrotate:latest', steps.login-ecr.outputs.registry, env.REPOSITORY) }}
+          FLUENT_BIT_IMAGE: ${{ format('{0}/{1}/spin-fluent-bit:2.23.0', steps.login-ecr.outputs.registry, env.REPOSITORY) }}
+          IMAGE_TAG: ${{ format('{0}/{1}{2}/{3}:{4}', steps.login-ecr.outputs.registry, env.PRODUCT_NAME, env.STAGE, env.APP_NAME, env.SERVICE_VERSION) }}
+      - name: 🏢 Deploy micro-service to EKS
+        uses: Consensys/kubernetes-action@master
+        if: (inputs.should_deploy && !(inputs.env == 'prod' || inputs.env == 'dr')) || (inputs.should_deploy_prod && (inputs.env == 'prod' || inputs.env == 'dr'))
+        env:
+          KUBE_CONFIG_DATA: ${{ env.KUBE_CONFIG_DATA }}
+        with:
+          args: ${{ format('apply -f ./{0}/kubernetes.deployment.yml', env.APP_NAME) }}
+      - name: 🔒 Logout of Amazon ECR
+        if: always()
+        run: |
+          docker system prune -a -f
+          docker logout $REGISTRY

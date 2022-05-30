@@ -1,0 +1,470 @@
+# ------------------- ALB Deployment -------------------- #
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: alb-${APP_NAME}-ingress-controller
+  name: alb-${APP_NAME}-ingress-controller
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alb-${APP_NAME}-ingress-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: alb-${APP_NAME}-ingress-controller
+    spec:
+      serviceAccountName: alb-ingress-controller
+      containers:
+        - name: alb-${APP_NAME}-ingress-controller
+          image: docker.io/amazon/aws-alb-ingress-controller:v1.1.4
+          args:
+            - --ingress-class=alb
+            - --cluster-name=${EKS_CLUSTER_NAME}
+            - --aws-vpc-id=${VPC_ID}
+            - --aws-region=${AWS_REGION}
+
+---
+# ------------------- INGRESS -------------------- #
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ${APP_NAME}-alb
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/certificate-arn: ${ALB_STP_ACM_ARN}
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+  labels:
+    stage: ${STAGE}
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /spei-transaction-service/*
+            backend:
+              serviceName: spei-transaction-service
+              servicePort: 443
+
+---
+# ------------------- SERVICE ------------------- #
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${APP_NAME}
+  annotations:
+    alb.ingress.kubernetes.io/target-type: ip
+  labels:
+    app: ${APP_NAME}
+    stage: ${STAGE}
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 9020
+    - name: https
+      port: 443
+      targetPort: 9020
+  type: NodePort
+  selector:
+    app: ${APP_NAME}
+
+---
+# ------------------- HPA ------------------- #
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ${APP_NAME}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ${APP_NAME}
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 50
+
+---
+# ------------------- SERVICE ACCOUNT ------------------- #
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${STAGE}-eks-${APP_NAME}"
+  labels:
+    app.kubernetes.io/name: ${APP_NAME}
+  name: ${APP_NAME}
+
+---
+# ------------------- CLUSTER ROLE BINDING ------------------- #
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: ${APP_NAME}-fluentd-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fluentd-spring
+subjects:
+  - kind: ServiceAccount
+    name: ${APP_NAME}
+    namespace: ${STAGE}
+
+---
+# ------------------- DEPLOYMENT ------------------- #
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${APP_NAME}
+  labels:
+    app: ${APP_NAME}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 14
+  minReadySeconds: 30
+  progressDeadlineSeconds: 300
+  selector:
+    matchLabels:
+      app: ${APP_NAME}
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubernetes.io/change-cause: Build ${BUILD_SHA}
+      labels:
+        app: ${APP_NAME}
+    spec:
+      serviceAccountName: ${APP_NAME}
+      volumes:
+        - name: fluent-bit-config
+          configMap:
+            name: fluent-bit-config
+        - name: app-logs
+          emptyDir: {}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+      containers:
+        - image: ${IMAGE_TAG}
+          imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: /var/log/containers
+              name: app-logs
+          name: ${APP_NAME}
+          livenessProbe:
+            httpGet:
+              path: /${APP_NAME}/actuator/health
+              port: 9020
+            initialDelaySeconds: 50
+            timeoutSeconds: 2
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /${APP_NAME}/actuator/health
+              port: 9020
+            initialDelaySeconds: 50
+            timeoutSeconds: 2
+            periodSeconds: 5
+            failureThreshold: 60
+          resources:
+            requests:
+              cpu: ${APP_RESOURCES_CPU_REQUEST}
+              memory: 1500Mi
+            limits:
+              memory: 1500Mi
+          ports:
+            - containerPort: 9020
+              protocol: TCP
+          env:
+            - name: ENV
+              value: ${STAGE}
+            - name: PROFILES_LABEL
+              value: ${STAGE}
+            - name: BUILD_HASH
+              value: ${BUILD_SHA}
+            - name: TREND_AP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: trend-micron
+                  key: key-spin-backend-services
+            - name: TREND_AP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: trend-micron
+                  key: secret-spin-backend-services
+            - name: MONGODB_READ_PREFERENCE
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: mongodb-read-preference
+                  optional: true
+            - name: MONGODB_URI_TRANSACTION
+              valueFrom:
+                secretKeyRef:
+                  name: spei-transaction-service
+                  key: mongodb-spei-transaction-uri
+            - name: AWS_COGNITO_JWKS
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: aws-cognito-jwks
+            - name: AWS_COGNITO_OAUTH2_TOKEN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: aws-cognito-oauth-token-url
+            - name: AWS_COGNITO_OAUTH2_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: spei-transaction-service
+                  key: aws-cognito-oauth-token-client-id
+                  optional: true
+            - name: AWS_COGNITO_OAUTH2_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: spei-transaction-service
+                  key: aws-cognito-oauth-token-client-secret
+                  optional: true
+            - name: SQS_SPEI_EXECUTION_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sqs
+                  key: sqs-spei-execution-url
+            - name: AWS_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: aws-region
+            - name: PAGOPOP_SERVICE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: pagopop-service-api-key
+            - name: PAGOPOP_SERVICE_ADMIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: pagopop-service-admin-api-key
+            - name: KINESIS_STREAM_PAYMENT_TRANSACTION_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: kinesis
+                  key: kinesis-stream-payment-transaction-name
+            - name: KINESIS_STREAM_SPEI_EXECUTION
+              valueFrom:
+                secretKeyRef:
+                  name: kinesis
+                  key: kinesis-stream-spei-execution-name
+            - name: CATALOGUE_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: catalogue-service-base-url
+            - name: STP_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: stp
+                  key: stp-base-url
+            - name: STP_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: stp
+                  key: stp-private-key
+            - name: STP_WEBHOOK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: stp
+                  key: stp-webhook-api-key
+            - name: SUPPORT_PHONE
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: customer-support-phone
+            - name: SUPPORT_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: customer-support-email
+            - name: STP_SOAP_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: stp
+                  key: stp-soap-base-url
+            - name: TRANSACTION_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: transaction-service-base-url
+            - name: BACKGROUND_PROCESS_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: background-process-service-base-url
+            - name: TRANSACTION_INQUIRY_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: transaction-inquiry-service-base-url
+            - name: USER_INQUIRY_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: user-inquiry-service-base-url
+            - name: SCHEDULER_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: scheduler-service-base-url
+            - name: ACCOUNT_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: account-service-base-url
+            - name: USER_INQUIRY_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: user-inquiry-service-base-url
+            - name: SPEI_TRANSACTION_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: spei-transaction-service-base-url
+            - name: SPEI_PROCESSING_SERVICE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: spei-processing-service-base-url
+            - name: SPRING_REDIS_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: redis
+                  key: redis-host
+            - name: SPRING_REDIS_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: redis
+                  key: redis-port
+            - name: KINESIS_STREAM_ENROLLMENT_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: kinesis
+                  key: kinesis-stream-enrollment-name
+            - name: KINESIS_STREAM_INSTRUMENT_MANAGEMENT_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: kinesis
+                  key: kinesis-stream-instrument-management-name
+            - name: TAX_PERCENTAGE_IVA
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: tax-percentage-iva
+            - name: SPEI_COMMISSION
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: spei-commission-cents
+            - name: APP_LINK_TRANSACTION_DETAIL
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: app-link-transaction-detail
+            - name: FEATURE_CONFIGCAT_APIKEY
+              valueFrom:
+                secretKeyRef:
+                  name: feature-flags
+                  key: configcat-apikey
+            - name: FEATURE_CONFIGCAT_ENABLED
+              valueFrom:
+                secretKeyRef:
+                  name: feature-flags
+                  key: configcat-enabled
+            - name: FEATURE_CONFIGCAT_MEMORY_MAP
+              valueFrom:
+                secretKeyRef:
+                  name: feature-flags
+                  key: configcat-memory-map
+                  optional: true
+            - name: STP_CLIENT_TIMEOUT
+              valueFrom:
+                secretKeyRef:
+                  name: stp
+                  key: stp-client-timeout-millis
+                  optional: true
+            - name: STP_AUTHORIZATION_SIGNATURE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: stp
+                  key: stp-authorization-signature-key
+        - name: logrotate
+          image: ${LOGROTATE_IMAGE}
+          securityContext:
+            runAsUser: 0
+          resources:
+            requests:
+              cpu: ${LOGROTATE_RESOURCES_CPU_REQUEST}
+              memory: ${LOGROTATE_RESOURCES_MEMORY_REQUEST}
+            limits:
+              cpu: ${LOGROTATE_RESOURCES_CPU_LIMIT}
+              memory: ${LOGROTATE_RESOURCES_MEMORY_LIMIT}             
+          volumeMounts:
+            - mountPath: /var/log/containers
+              name: app-logs
+          env:
+            - name: CRON_EXPR
+              value: "*/15 * * * *"
+            - name: LOGROTATE_LOGFILES
+              value: "/var/log/containers/*.log"
+            - name: LOGROTATE_FILESIZE
+              value: "50M"
+            - name: LOGROTATE_FILENUM
+              value: "5"
+        - name: fluent-bit
+          image: ${FLUENT_BIT_IMAGE}
+          securityContext:
+            runAsUser: 0
+          env:
+            - name: AWS_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: pagopop
+                  key: aws-region
+            - name: CLUSTER_NAME
+              value: ${STAGE}-eks-master-cluster
+            - name: HTTP_SERVER
+              value: "On"
+            - name: HTTP_PORT
+              value: "2020"
+            - name: READ_FROM_HEAD
+              value: "true"
+            - name: READ_FROM_TAIL
+              value: "true"
+            - name: APP_NAME
+              value: ${APP_NAME}
+            - name: STAGE
+              value: ${STAGE}
+            - name: CI_VERSION
+              value: "k8s/1.3.9"
+          resources:
+            limits:
+              cpu: ${FLUENT_BIT_RESOURCES_CPU_LIMIT}
+              memory: ${FLUENT_BIT_RESOURCES_MEMORY_LIMIT}
+            requests:
+              cpu: ${FLUENT_BIT_RESOURCES_CPU_REQUEST}
+              memory: ${FLUENT_BIT_RESOURCES_MEMORY_REQUEST}
+          volumeMounts:
+            - name: fluent-bit-config
+              mountPath: /fluent-bit/etc/
+            - name: app-logs
+              mountPath: /var/log/containers
+
